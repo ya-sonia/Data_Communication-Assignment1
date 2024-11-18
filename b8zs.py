@@ -3,28 +3,25 @@ import numpy as np
 
 # B8ZS (Scrambled AMI Encoding)
 def b8zs_encoding(bits):
-    encoded_bits = np.array([])  # To store encoded bits
+    encoded_bits = []  # To store encoded bits
     consecutive_zeros_count = 0
-    current_level = 1
+    current_level = 1  # Tracks current polarity (+1 or -1)
     scrambled_segments = []  # To track scrambled signal segments
 
     for bit in bits:
         if bit == '1':
-            encoded_bits = np.append(encoded_bits, current_level)
+            # Append '1' with alternating polarity
+            encoded_bits.append(current_level)
             consecutive_zeros_count = 0
-            current_level = -current_level  # Alternate polarity for '1'
+            current_level = -current_level  # Alternate polarity
         elif bit == '0':
             consecutive_zeros_count += 1
-            if consecutive_zeros_count == 8:  # B8ZS substitution for 8 zeros
-                encoded_bits = encoded_bits[:-7]  # Remove last 7 zeros
-
-                # B8ZS substitution pattern: 000VB0VB
-                substitution = [0, 0, 0, current_level, -current_level, 0, -current_level, current_level]
-                encoded_bits = np.append(encoded_bits, substitution)
-                scrambled_segments.append(substitution)  # Track scrambled segment
+            encoded_bits.append(0)
+            if consecutive_zeros_count == 8:
+                # Replace the last 8 zeros with the B8ZS substitution pattern
+                encoded_bits[-8:] = [0, 0, 0, -current_level, current_level, 0, current_level, -current_level]
+                scrambled_segments.append(encoded_bits[-8:])  # Track scrambled segment
                 consecutive_zeros_count = 0
-            else:
-                encoded_bits = np.append(encoded_bits, 0)
 
     return encoded_bits, scrambled_segments
 
@@ -33,16 +30,18 @@ def b8zs_encoding(bits):
 def b8zs_decoding(encoded_bits):
     decoded_bits = []
     i = 0
+
     while i < len(encoded_bits):
-        if i + 7 < len(encoded_bits) and np.array_equal(
-            encoded_bits[i:i + 8], [0, 0, 0, encoded_bits[i + 3], -encoded_bits[i + 3], 0, -encoded_bits[i + 3], encoded_bits[i + 3]]):
+        # Check for B8ZS substitution pattern
+        if i + 7 < len(encoded_bits) and encoded_bits[i:i + 8] == [0, 0, 0, -encoded_bits[i + 3], encoded_bits[i + 3], 0, encoded_bits[i + 3], -encoded_bits[i + 3]]:
             decoded_bits.extend(['0'] * 8)  # Decode the B8ZS pattern back to 8 zeros
             i += 8
         else:
-            if encoded_bits[i] == 1 or encoded_bits[i] == -1:
-                decoded_bits.append('1')
-            else:
+            # Decode regular AMI or 0
+            if encoded_bits[i] == 0:
                 decoded_bits.append('0')
+            else:
+                decoded_bits.append('1')
             i += 1
 
     return ''.join(decoded_bits)
@@ -50,29 +49,26 @@ def b8zs_decoding(encoded_bits):
 
 # Plot the B8ZS Encoded Data and Scrambled Signal
 def plot_b8zs(b8zs_data, scrambled_segments):
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
 
-    # Plot B8ZS encoded data
-    plt.step(np.arange(len(b8zs_data)), b8zs_data, where='post', color='grey', linewidth=4, label="B8ZS Encoded Data")
+    # Plot the B8ZS encoded data
+    plt.step(range(len(b8zs_data)), b8zs_data, where='post', label="B8ZS Encoded Signal", color='blue', linewidth=2)
+    plt.axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.6)
 
-    # Plot scrambled signal segments
+    # Highlight scrambled segments
     for segment in scrambled_segments:
-        segment_start = len(b8zs_data) - len(np.concatenate(scrambled_segments))
-        plt.plot(np.arange(segment_start, segment_start + len(segment)), segment, color='blue', label="Scrambled Segment")
+        segment_start = len(b8zs_data) - len(segment)
+        plt.plot(range(segment_start, segment_start + len(segment)), segment, color='red', linewidth=2.5, label="Scrambled Segment")
 
-    plt.title('B8ZS Encoded Data with Scrambled Signal')
-    plt.xlabel('Bit Index')
-    plt.ylabel('Voltage Level')
-    plt.axhline(0, color='red', linestyle='--')
-    plt.ylim(-1.5, 1.5)  # Voltage levels for B8ZS
-    for i in range(0, len(b8zs_data)):
-        plt.axvline(i, color='black', linestyle='--', alpha=0.3)
-
-    # Adding labels to the graph
+    plt.title("B8ZS Encoded Data with Scrambled Signal")
+    plt.xlabel("Bit Index")
+    plt.ylabel("Voltage Level")
     plt.legend(loc="upper right")
+    plt.grid(True)
     plt.show()
 
 
+# Main Program
 if __name__ == '__main__':
     try:
         size = int(input("Enter the number of bits you want to input: "))
